@@ -26,6 +26,7 @@ using namespace std;
     DATA(float, gen_phi)                        \
     DATA(float, gen_DR)                         \
     DATA(int, gen_pdgId)                        \
+    DATA(int, gen_status)                       \
     DATA(int, chosen_clus_pos)                  \
     DATA(float, minDR)                          \
     DATA(float, minDEta)                        \
@@ -52,6 +53,7 @@ using namespace std;
     DATA(float, mct_eta)                        \
     DATA(float, mct_phi)                        \
     DATA(float, mct_energy)                     \
+    DATA(float, mct_t0)                         \
     DATA(float, mct_convRadius)                 \
     DATA(float, mct_convZ)                      \
     DATA(float, mct_convPhi)                    \
@@ -62,8 +64,19 @@ using namespace std;
     DATA(float, mct_ele2_eta)                   \
     DATA(float, mct_ele2_phi)                   \
     DATA(float, mct_eles_dr)                    \
+    DATA(float, mct_eles_dphi)                  \
     DATA(float, mct_ele1_dr)                    \
-    DATA(float, mct_ele2_dr)
+    DATA(float, mct_ele2_dr)                    \
+    DATA(float, mct_ele1_tmtd)                  \
+    DATA(float, mct_ele2_tmtd)                  \
+    DATA(float, mct_ele1_xmtd)                  \
+    DATA(float, mct_ele1_ymtd)                  \
+    DATA(float, mct_ele1_zmtd)                  \
+    DATA(float, mct_ele2_xmtd)                  \
+    DATA(float, mct_ele2_ymtd)                  \
+    DATA(float, mct_ele2_zmtd)                  \
+    DATA(float, mct_ele1_dphi)                  \
+    DATA(float, mct_ele2_dphi)                  \
     
 #define DATA_CLASS_TABLE                        \
     DATA(vector<float>, clus_size)              \
@@ -75,7 +88,7 @@ using namespace std;
     DATA(vector<float>, clus_eta)               \
     DATA(vector<float>, clus_phi)               \
     DATA(vector<float>, clus_seed_energy)       \
-        DATA(vector<float>, clus_seed_time)     \
+    DATA(vector<float>, clus_seed_time)     \
     DATA(vector<float>, clus_seed_x)            \
     DATA(vector<float>, clus_seed_y)            \
     DATA(vector<float>, clus_x)                 \

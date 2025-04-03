@@ -1,6 +1,6 @@
 import FWCore.ParameterSet.Config as cms
 
-MTDNeutralsAnalyzer = cms.EDAnalyzer('MTDNeutralsAnalyzer_new',
+MTDNeutralsAnalyzer = cms.EDAnalyzer('myMTDNeutralsAnalyzer',
                                      recoTracks = cms.untracked.InputTag("generalTracks"),
                                      genTracks = cms.untracked.InputTag("mix:MergedTrackTruth"),
                                      genParticlesTag = cms.untracked.InputTag("genParticles"),
@@ -11,7 +11,9 @@ MTDNeutralsAnalyzer = cms.EDAnalyzer('MTDNeutralsAnalyzer_new',
                                      clustersBTLTag = cms.untracked.InputTag("mtdClusters:FTLBarrel"),                                     
                                      clustersETLTag = cms.untracked.InputTag("mtdClusters:FTLEndcap"),
                                      tp2SimAssociationMapTag = cms.untracked.InputTag("mtdSimLayerClusterToTPAssociation"),
+                                     r2sAssociationMapTag = cms.untracked.InputTag("mtdRecoClusterToSimLayerClusterAssociation"),
                                      pfCandidatesTag = cms.untracked.InputTag("particleFlow"),
+                                     mtdTrackingRecHits = cms.untracked.InputTag("mtdTrackingRecHits"),
                                      #pfCandidatesTag = cms.untracked.InputTag("particleFlowClusterECAL"),
                                      genXYZTag = cms.untracked.InputTag("genParticles", "xyz0"),
                                      genT0Tag = cms.untracked.InputTag("genParticles", "t0"),
