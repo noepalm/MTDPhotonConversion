@@ -42,8 +42,14 @@ using namespace std;
     DATA(vector<vector<float>>, GENElectron_xClus)    \
     DATA(vector<vector<float>>, GENElectron_yClus)    \
     DATA(vector<vector<float>>, GENElectron_zClus)    \
+    DATA(vector<vector<float>>, GENElectron_tStdClus)    \
+    DATA(vector<vector<float>>, GENElectron_xStdClus)    \
+    DATA(vector<vector<float>>, GENElectron_yStdClus)    \
+    DATA(vector<vector<float>>, GENElectron_zStdClus)    \
     DATA(vector<vector<int>>, GENElectron_typeClus)   \
     DATA(vector<vector<float>>, GENElectron_energyClus)    \
+    DATA(vector<vector<float>>, GENElectron_energyStdClus)    \
+    DATA(vector<vector<int>>, GENElectron_nHitsClus)    \
     DATA(vector<float>, Photon_pt)                     \
     DATA(vector<float>, Photon_eta)                    \
     DATA(vector<float>, Photon_phi)                    \

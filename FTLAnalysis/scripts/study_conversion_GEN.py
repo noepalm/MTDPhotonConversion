@@ -160,17 +160,18 @@ fig.savefig(f"{local_folder}/conversion_vertex_xy_hist.pdf")
 z = conv_photons.convZ
 
 fig, ax = plt.subplots()
-ax.scatter(ak.flatten(z), ak.flatten(rho), s=1)
+ax.scatter(ak.flatten(rho), ak.flatten(z), s=1)
 ax.set_xlabel("rho [cm]")
 ax.set_ylabel("z [cm]")
-ax.set_xlim(-200, 200)
+ax.set_xlim(0, 120)
+ax.set_ylim(-200, 200)
 ax.set_title("Conversion vertex position in z, rho plane", pad = 40)
 fig.savefig(f"{local_folder}/conversion_vertex_z_rho.png")
 fig.savefig(f"{local_folder}/conversion_vertex_z_rho.pdf")
 
 # do the same but with 2D hist
 fig, ax = plt.subplots(figsize = (10, 8))
-h = ax.hist2d(ak.flatten(rho), ak.flatten(z), bins = 30)
+h = ax.hist2d(ak.flatten(rho).to_numpy(), ak.flatten(z).to_numpy(), bins = 30, range = [[0, 120], [-200, 200]])
 ax.set_xlabel("rho [cm]")
 ax.set_ylabel("z [cm]")
 fig.colorbar(h[3], ax = ax)
@@ -254,8 +255,8 @@ fig.savefig(f"{local_folder}/genPV.png")
 fig.savefig(f"{local_folder}/genPV.pdf")
 
 # -------- MTD INFO PLOTS -------- #
-nrows = 4
-ncols = 3
+nrows = 8
+ncols = 4
 
 fig, axs = plt.subplots(nrows, ncols, figsize = (12*ncols, 12*nrows))
 
@@ -303,7 +304,7 @@ for rho_min, rho_max in zip(rho_range[:-1], rho_range[1:]):
     ax.hist(ak.ravel(tmtd_1[mask][ele1[mask].typeClus == 0]), label = f"{rho_min} < Rconv < {rho_max} cm", histtype = "step", bins = 50, density = True, range = [2.5, 25])
 ax.set_xlabel("t [ns]")
 ax.set_ylabel("Density")
-ax.set_title("MTD time of direct clusters vs conversion radius", pad = 40)
+ax.set_title("MTD time of directs vs conv. radius", pad = 40)
 ax.legend()
 
 ### same, but only selected converted photons where BOTH electrons have a direct cluster
@@ -317,11 +318,43 @@ for rho_min, rho_max in zip(rho_range[:-1], rho_range[1:]):
     ax.hist(ak.ravel(ak.firsts(tmtd_1[mask1][mask2], axis = 2)), label = f"{rho_min} < Rconv < {rho_max} cm", histtype = "step", bins = 50, density = True, range = [2.5, 25])
 ax.set_xlabel("t [ns]")
 ax.set_ylabel("Density")
-ax.set_title("MTD time of direct clusters (for photons with 2 DIRECT clus) vs conversion radius", pad = 40)
+ax.set_title(f"MTD time of directs (for $\gamma$ w/ 2 DIRECT) vs conv. radius", pad = 40)
 ax.legend()
 
-# Free slot
+# Time broken down by photon eta
 ax = axs[1, 2]
+mask_loweta = good_cluster_photons * (eta < 0.6)
+mask1_loweta = mask_loweta * (ele1.typeClus == 0)
+mask2_loweta = mask_loweta * (ele2.typeClus == 0)
+ax.hist(ak.ravel(ak.firsts(tmtd_1[mask1_loweta], axis = 2)), range = [2.5, 8], bins = 50, histtype = "step", label = r"Lead, $|\eta| < 0.6$")
+# ax.hist(ak.ravel(ak.firsts(tmtd_2[mask2_loweta], axis = 2)), bins = 100, histtype = "step", label = r"Sublead, $|\eta| < 0.6$")
+mask_higheta = good_cluster_photons * (eta >= 0.6)
+mask1_higheta = mask_higheta * (ele1.typeClus == 0)
+mask2_higheta = mask_higheta * (ele2.typeClus == 0)
+ax.hist(ak.ravel(ak.firsts(tmtd_1[mask1_higheta], axis = 2)), range = [2.5, 8], bins = 50, histtype = "step", label = r"Lead, $|\eta| \geq 0.6$")
+# ax.hist(ak.ravel(ak.firsts(tmtd_2[mask2_higheta], axis = 2)), bins = 100, histtype = "step", label = r"Sublead, $|\eta| > 0.6$")
+ax.set_xlabel("t [ns]")
+ax.set_ylabel("Entries")
+ax.set_title(r"MTD time of directs for conv. with 2 direct hits vs. conversion $\eta$", pad = 40)
+ax.legend()
+
+# TIME vs. ENERGY
+ax = axs[1, 3]
+for i in range(4)[::-1]:
+    arrx1 = ak.ravel(ele1.tClus[ele1.typeClus == i])
+    arrx2 = ak.ravel(ele2.tClus[ele2.typeClus == i])
+    arrx = ak.concatenate([arrx1, arrx2])
+    arry1 = ak.ravel(ele1.energyClus[ele1.typeClus == i])
+    arry2 = ak.ravel(ele2.energyClus[ele2.typeClus == i])
+    arry = ak.concatenate([arry1, arry2])
+    ax.scatter(arrx, arry, s = 1, alpha = 0.5, label = type_dict[i], color = f"C{i}")
+ax.set_xlabel("t [ns]")
+ax.set_ylabel("E [MeV]")
+ax.set_xlim(4, 10)
+ax.set_ylim(0, 10)
+ax.set_title("MTD time vs energy", pad = 40)
+ax.legend(markerscale = 10)
+ax.grid()
 
 # cluster type distribution
 # (can be 0 = direct, 1 = secondary, 2 = looper, 3 = calo backscatter)
@@ -338,33 +371,145 @@ ax.legend()
 ax.set_xticks([0, 1, 2, 3])
 ax.set_xticklabels(["Direct", "Secondary", "Looper", "Calo backscatter"])
 
+# --- ENERGY, SIZE, ETC ---
+ax = axs[2, 0]
+plot_range = (0, 10)
+# plot energy distribution for each cluster type
+ax.hist(ak.concatenate([ak.ravel(ele1.energyClus), ak.ravel(ele2.energyClus)]).to_numpy(), bins = 50, histtype = "bar", range = plot_range, label = "All", color = "gray", alpha = 0.3)
+for i in range(4):
+    ax.hist(ak.concatenate([ak.ravel(ele1.energyClus[ele1.typeClus == i]), ak.ravel(ele2.energyClus[ele2.typeClus == i])]).to_numpy(), bins = 50, range = plot_range, histtype = "step", label = type_dict[i])
+ax.set_xlabel("E [MeV]")
+ax.set_ylabel("Entries")
+ax.set_title("MTD cluster energy", pad = 40)
+ax.set_yscale("log")
+ax.legend()
+
+ax = axs[2, 1]
+plot_range = (0, 10)
+ax.hist(ak.concatenate([ak.ravel(ele1.energyClus[abs(eta) < 0.6]), ak.ravel(ele2.energyClus[abs(eta) < 0.6])]).to_numpy(), bins = 50, histtype = "step", range = plot_range, label = "$|\eta| < 0.6$", density = True)
+ax.hist(ak.concatenate([ak.ravel(ele1.energyClus[abs(eta) >= 0.6]), ak.ravel(ele2.energyClus[abs(eta) < 0.6])]).to_numpy(), bins = 50, histtype = "step", range = plot_range, label = "$|\eta| \geq 0.6$", density = True)
+ax.set_xlabel("E [MeV]")
+ax.set_ylabel("Density")
+ax.set_title("MTD cluster energy vs. eta", pad = 40)
+ax.set_yscale("log")
+ax.legend()
+
+ax = axs[2, 2]
+ax.hist(ak.concatenate([ak.ravel(ele1.nHitsClus), ak.ravel(ele2.nHitsClus)]).to_numpy(), bins = 11, range = (-0.5, 10.5), histtype = "step", label = "All", density = True)
+# only for MTD conversions
+ax.hist(ak.concatenate([ak.ravel(ele1.nHitsClus[rho > 115]), ak.ravel(ele2.nHitsClus[rho > 115])]).to_numpy(), bins = 11, range = (-0.5, 10.5), histtype = "step", label = "MTD conversions", density = True)
+ax.set_xlabel("#hits")
+ax.set_ylabel("Density")
+ax.set_title("MTD cluster number of hits", pad = 40)
+ax.set_yscale("log")
+ax.legend()
+
+ax = axs[2, 3]
+# number of clusters PER ELECTRON
+xmax = 40
+ax.hist(ak.concatenate([ak.ravel(ak.num(ele1.tClus[ele1.tClus > -100], axis = 2)), ak.ravel(ak.num(ele2.tClus[ele2.tClus > -100], axis = 2))]), bins = xmax + 1, range = (-0.5, xmax + 0.5), histtype = "step", label = "All", density = True)
+# MTD conversions only
+ax.hist(ak.concatenate([ak.ravel(ak.num(ele1.tClus[ele1.tClus > -100][rho > 115], axis = 2)), ak.ravel(ak.num(ele2.tClus[ele2.tClus > -100][rho > 115], axis = 2))]), bins = xmax + 1, range = (-0.5, xmax + 0.5), histtype = "step", label = "MTD conversions", density = True)
+ax.set_xlabel("#clusters")
+ax.set_ylabel("Entries")
+ax.set_title("Number of clusters per electron", pad = 40)
+ax.set_yscale("log")
+ax.legend()
+
+# -------------------------
+
 # x, y, z positions
 vars = ["xClus", "yClus", "zClus"]
-for var, ax in zip(vars, axs[2]):
+for var, ax in zip(vars, axs[3]):
     plot_range = [-120, 120] if var != "zClus" else [-300, 300]
-    ax.hist(ak.concatenate([ak.ravel(ele1[var]), ak.ravel(ele2[var])]), bins = 500, range = plot_range, histtype = "step", label = "All")
+    ax.hist(ak.concatenate([ak.ravel(ele1[var]), ak.ravel(ele2[var])]), bins = 100, range = plot_range, histtype = "step", label = "All")
     ax.set_xlabel(f"{var[:1]} [cm]")
     ax.set_ylabel("Entries")
     ax.set_title(f"MTD cluster {var[:1]} position", pad = 40)
     ax.grid()
     ax.legend()
 
+# x, y, z positions std dev
+vars = ["tStdClus", "xStdClus", "yStdClus", "zStdClus"]
+for var, ax in zip(vars, axs[4]):
+    plot_range = [0, 2]
+    nbins = 50
+    if var == "tStdClus":
+        plot_range[1] = 0.3
+    elif var == "yStdClus":
+        plot_range[1] = 0.2
+    elif var == "zStdClus":
+        plot_range[1] = 0.2
+    # All conversions
+    plot_hist_from_array(ak.concatenate([ak.ravel(ele1[var]), ak.ravel(ele2[var])]), ax = ax, bins = nbins, range = plot_range, histtype = "step", label = "All", density = True, print_stats = False)
+    # MTD conversions
+    plot_hist_from_array(ak.concatenate([ak.ravel(ele1[var][rho > 115]), ak.ravel(ele2[var][rho > 115])]), ax = ax, bins = nbins, range = plot_range, histtype = "step", label = "MTD conversions", density = True, print_stats = False)
+    unit = "[cm]" if var != "tStdClus" else "[ns]"
+    ax.set_xlabel(f"{var[:1]} {unit}")
+    ax.set_ylabel("Density")
+    ax.set_title(f"MTD hit {var[:1]} std. dev. in cluster", pad = 40)
+    ax.set_yscale("log")
+    ax.grid()
+    ax.legend()
+
+# plot standard deviation of clusters PER ELECTRON
+vars = ["tClus", "xClus", "yClus", "zClus"]
+for var, ax in zip(vars, axs[5]):
+    plot_range = [0, 150]
+    if var == "tClus":
+        plot_range[1] = 10
+    if var == "xClus" or var == "yClus":
+        plot_range[1] = 120
+    # All conversions
+    plot_hist_from_array(ak.concatenate([ak.ravel(ak.std(ele1[var], axis = 2)), ak.ravel(ak.std(ele2[var], axis = 2))]).to_numpy(), ax = ax, bins = 50, range = plot_range, histtype = "step", label = "All", density = True, print_stats = False)
+    # MTD conversions
+    plot_hist_from_array(ak.concatenate([ak.ravel(ak.std(ele1[var][rho > 115], axis = 2)), ak.ravel(ak.std(ele2[var][rho > 115], axis = 2))]).to_numpy(), ax = ax, bins = 50, range = plot_range, histtype = "step", label = "MTD conversions", density = True,  print_stats = False)
+    # exclude calo backscatter
+    clusters1 = ele1[var][rho > 115][ele1.typeClus[rho > 115] <= 0]
+    clusters2 = ele2[var][rho > 115][ele2.typeClus[rho > 115] <= 0]
+    plot_hist_from_array(ak.concatenate([ak.ravel(ak.std(clusters1, axis = 2)), ak.ravel(ak.std(clusters2, axis = 2))]).to_numpy(), ax = ax, bins = 50, range = plot_range, histtype = "step", label = "All, direct only", density = True, print_stats = False)
+    unit = "[cm]" if var != "tStdClus" else "[ns]"
+    ax.set_xlabel(f"{var[:1]} {unit}")
+    ax.set_ylabel("Density")
+    ax.set_title(f"MTD cluster {var[:1]} std. dev. per electron", pad = 40)
+    ax.set_yscale("log")
+    ax.grid()
+    ax.legend()
+
+# plot standard deviation of clusters PER ELECTRON for direct, detailed zoom
+vars = ["tClus", "xClus", "yClus", "zClus"]
+for var, ax in zip(vars, axs[6]):
+    plot_range = [0, 0.3]
+    if var != "tClus":
+        plot_range[1] = 4
+    # exclude calo backscatter
+    clusters1 = ele1[var][rho > 115][ele1.typeClus[rho > 115] <= 0]
+    clusters2 = ele2[var][rho > 115][ele2.typeClus[rho > 115] <= 0]
+    plot_hist_from_array(ak.concatenate([ak.ravel(ak.std(clusters1, axis = 2)), ak.ravel(ak.std(clusters2, axis = 2))]).to_numpy(), ax = ax, bins = 50, range = plot_range, histtype = "step", label = "All, direct only", density = True, print_stats = False)
+    unit = "[cm]" if var != "tStdClus" else "[ns]"
+    ax.set_xlabel(f"{var[:1]} {unit}")
+    ax.set_ylabel("Density")
+    ax.set_title(f"MTD cluster {var[:1]} std. dev. per electron, directs only", pad = 40)
+    ax.set_yscale("log")
+    ax.grid()
+    ax.legend()
+
 # phi
-ax = axs[3, 0]
+ax = axs[-1, 0]
 phi1 = ak.ravel(np.arctan2(ymtd_1[abs(ymtd_1) < 130], xmtd_1[abs(xmtd_1) < 130]))
 phi2 = ak.ravel(np.arctan2(ymtd_2[abs(ymtd_2) < 130], xmtd_2[abs(xmtd_2) < 130]))
 
-ax.hist(ak.ravel(ak.concatenate([phi1, phi2])), bins = 400, histtype = "step", label = "All")
+ax.hist(ak.ravel(ak.concatenate([phi1, phi2])), bins = 50, histtype = "step", label = "All")
 ax.grid()
 ax.set_xlabel(r"$\phi$")
 ax.set_ylabel("Entries")
 ax.legend()
 
 # rho
-ax = axs[3, 1]
+ax = axs[-1, 1]
 rho1 = np.sqrt(xmtd_1[abs(xmtd_1) < 130]**2 + ymtd_1[abs(ymtd_1) < 130]**2)
 rho2 = np.sqrt(xmtd_2[abs(xmtd_2) < 130]**2 + ymtd_2[abs(ymtd_2) < 130]**2)
-ax.hist(ak.ravel(ak.concatenate([rho1, rho2])).to_numpy(), bins = 400, range = [115.4, 116.4], histtype = "step", label = "All")
+ax.hist(ak.ravel(ak.concatenate([rho1, rho2])).to_numpy(), bins = 100, range = [115.4, 116.4], histtype = "step", label = "All")
 ax.set_xlabel("R [cm]")
 ax.set_ylabel("Entries")
 ax.set_title("MTD cluster radius", pad = 40)
@@ -473,11 +618,11 @@ dt2 = t0_e2 - genPV.t #t0_photon
 
 ax = axs[1, 0]
 plot_range = [-0.02, 20]
-plot_hist_from_array(dt1, ax = ax, bins = 50, histtype = "step", label = "All, leading", print_stats = False, range = plot_range)
-plot_hist_from_array(dt2, ax = ax, bins = 50, histtype = "step", label = "All, subleading", print_stats = False, range = plot_range)
+plot_hist_from_array(dt1, ax = ax, bins = 50, histtype = "step", label = "All, lead", print_stats = False, range = plot_range)
+plot_hist_from_array(dt2, ax = ax, bins = 50, histtype = "step", label = "All, sublead", print_stats = False, range = plot_range)
 # same but only for mtd conversions
-plot_hist_from_array(dt1[rho[good_cluster_photons] >= 115], ax = ax, histtype = "fill", alpha = 0.5, bins = 50, color = "C0", label = "MTD conversions, leading", print_stats = False, range = plot_range)
-plot_hist_from_array(dt2[rho[good_cluster_photons] >= 115], ax = ax, histtype = "fill", alpha = 0.5, bins = 50, color = "C1", label = "MTD conversions, subleading", print_stats = False, range = plot_range)
+plot_hist_from_array(dt1[rho[good_cluster_photons] >= 115], ax = ax, histtype = "step", alpha = 0.8, linestyle = "dashed", bins = 50, color = "C0", label = "MTD conv., lead", print_stats = False, range = plot_range)
+plot_hist_from_array(dt2[rho[good_cluster_photons] >= 115], ax = ax, histtype = "step", alpha = 0.8, linestyle = "dashed", bins = 50, color = "C1", label = "MTD conv., sublead", print_stats = False, range = plot_range)
 ax.set_xlabel(r"$\Delta t$ [ns]")
 ax.set_ylabel("Entries")
 ax.set_yscale("log")
@@ -494,11 +639,11 @@ dphi2_photon = angle_to_mpi_pi(phi2 - conv_photons.phi[good_cluster_photons])
 
 ax = axs[1, 1]
 plot_range = [-0.5, 0.5]
-ax.hist(ak.flatten(dphi1_photon), bins = 50, histtype = "step", range = plot_range, label = "All, leading")
-ax.hist(ak.flatten(dphi2_photon), bins = 50, histtype = "step", range = plot_range, label = "All, subleading")
+ax.hist(ak.flatten(dphi1_photon), bins = 50, histtype = "step", range = plot_range, label = "All, lead")
+ax.hist(ak.flatten(dphi2_photon), bins = 50, histtype = "step", range = plot_range, label = "All, sublead")
 # same but only for mtd conversions
-ax.hist(ak.flatten(dphi1_photon[rho[good_cluster_photons] >= 115]), bins = 50, range = plot_range, color = "C0", alpha = 0.5, label = "MTD conversions, leading")
-ax.hist(ak.flatten(dphi2_photon[rho[good_cluster_photons] >= 115]), bins = 50, range = plot_range, color = "C1", alpha = 0.5, label = "MTD conversions, subleading")
+ax.hist(ak.flatten(dphi1_photon[rho[good_cluster_photons] >= 115]), bins = 50, range = plot_range, color = "C0", histtype = "step", linestyle = "dashed", alpha = 0.9, label = "MTD conv., lead")
+ax.hist(ak.flatten(dphi2_photon[rho[good_cluster_photons] >= 115]), bins = 50, range = plot_range, color = "C1", histtype = "step", linestyle = "dashed", alpha = 0.9, label = "MTD conv., sublead")
 
 ax.set_xlabel(r"$\Delta \phi$")
 ax.set_ylabel("Entries")
@@ -579,6 +724,17 @@ ax.set_xlabel("Conversion radius [cm]")
 ax.set_ylabel("Entries")
 ax.set_title("Conversion radius", pad = 40)
 ax.legend()
+
+##### BACK TO DIELECTRON KINEMATICS
+
+# pt1 vs pt2
+ax = axs[2, 0]
+ax.scatter(ak.flatten(ele1.pt), ak.flatten(ele2.pt), s = 1, alpha = 0.5)
+ax.set_xlim(0, 10)
+ax.set_ylim(0, 5)
+ax.set_xlabel(r"$p_T(1)$ [GeV]")
+ax.set_ylabel(r"$p_T(2)$ [GeV]")
+ax.set_title("Dielectron $p_T$ correlation", pad = 40)
 
 fig.savefig(f"{local_folder}/conversion_kinematics.png")
 fig.savefig(f"{local_folder}/conversion_kinematics.pdf")
@@ -946,8 +1102,8 @@ for ax, rho_min, rho_max in zip(axs, rho_range[:-1], rho_range[1:]):
         # mask1 = mask * (ele1.typeClus == 0) * (dphi1_photon_all >= phi_min) * (dphi1_photon_all < phi_max) * (abs(deta1_photon_all) <= 0.02)
         # mask2 = mask * (ele2.typeClus == 0) * (dphi2_photon_all >= phi_min) * (dphi2_photon_all < phi_max) * (abs(deta2_photon_all) <= 0.02)
 
-        dt1 = tmtd_1[mask1] - np.sqrt((xmtd_1[mask1] - genPV.x)**2 + (ymtd_1[mask1] - genPV.y)**2 + (zmtd_1[mask1] - genPV.z)**2) / c - genPV.t
-        dt2 = tmtd_2[mask2] - np.sqrt((xmtd_2[mask2] - genPV.x)**2 + (ymtd_2[mask2] - genPV.y)**2 + (zmtd_2[mask2] - genPV.z)**2) / c - genPV.t
+        dt1 = ak.firsts(tmtd_1[mask1] - np.sqrt((xmtd_1[mask1] - genPV.x)**2 + (ymtd_1[mask1] - genPV.y)**2 + (zmtd_1[mask1] - genPV.z)**2) / c - genPV.t, axis = 2)
+        dt2 = ak.firsts(tmtd_2[mask2] - np.sqrt((xmtd_2[mask2] - genPV.x)**2 + (ymtd_2[mask2] - genPV.y)**2 + (zmtd_2[mask2] - genPV.z)**2) / c - genPV.t, axis = 2)
 
         arr = ak.concatenate([ak.ravel(dt1), ak.ravel(dt2)])
 
@@ -968,11 +1124,11 @@ for ax, rho_min, rho_max in zip(axs, rho_range[:-1], rho_range[1:]):
     mask1 = mask * (ele1.typeClus == 0)
     mask2 = mask * (ele2.typeClus == 0)
 
-    dt1 = tmtd_1[mask1] - np.sqrt((xmtd_1[mask1] - genPV.x)**2 + (ymtd_1[mask1] - genPV.y)**2 + (zmtd_1[mask1] - genPV.z)**2) / c - genPV.t
-    dt2 = tmtd_2[mask2] - np.sqrt((xmtd_2[mask2] - genPV.x)**2 + (ymtd_2[mask2] - genPV.y)**2 + (zmtd_2[mask2] - genPV.z)**2) / c - genPV.t
+    dt1 = ak.firsts(tmtd_1[mask1] - np.sqrt((xmtd_1[mask1] - genPV.x)**2 + (ymtd_1[mask1] - genPV.y)**2 + (zmtd_1[mask1] - genPV.z)**2) / c - genPV.t, axis = 2)
+    dt2 = ak.firsts(tmtd_2[mask2] - np.sqrt((xmtd_2[mask2] - genPV.x)**2 + (ymtd_2[mask2] - genPV.y)**2 + (zmtd_2[mask2] - genPV.z)**2) / c - genPV.t, axis = 2)
 
-    dphi1 = angle_to_mpi_pi(np.arctan2(ymtd_1[mask1], xmtd_1[mask1]) - conv_photons.phi)
-    dphi2 = angle_to_mpi_pi(np.arctan2(ymtd_2[mask2], xmtd_2[mask2]) - conv_photons.phi)
+    dphi1 = angle_to_mpi_pi(ak.firsts(np.arctan2(ymtd_1[mask1], xmtd_1[mask1]), axis = 2) - conv_photons.phi)
+    dphi2 = angle_to_mpi_pi(ak.firsts(np.arctan2(ymtd_2[mask2], xmtd_2[mask2]), axis = 2) - conv_photons.phi)
 
     arrx = ak.concatenate([ak.ravel(dphi1), ak.ravel(dphi2)])
     arry = ak.concatenate([ak.ravel(dt1), ak.ravel(dt2)])
@@ -1111,12 +1267,12 @@ rho_maxs = [110, 118]
 
 for rho_min, rho_max in zip(rho_mins, rho_maxs):
 
-    print(f"LOOKING AT EVENTS WITH {rho_min} < Rconv < {rho_max}\n")
+    # print(f"LOOKING AT EVENTS WITH {rho_min} < Rconv < {rho_max}\n")
 
     bad_events_1 = (rho > rho_min) * (rho < rho_max)
     bad_events_2 = (rho > rho_min) * (rho < rho_max)
 
-    nrows = 7
+    nrows = 10
     ncols = 3
     fig, axs = plt.subplots(nrows, ncols, figsize = (12*ncols, 12*nrows))
 
@@ -1155,8 +1311,8 @@ for rho_min, rho_max in zip(rho_mins, rho_maxs):
     count = count[bin_centers < 4]
     bin_widths = bin_widths[bin_centers < 4]
     bin_centers = bin_centers[bin_centers < 4]
-    # draw histogram
-    ax.bar(bin_centers, count, width = bin_widths, align = "center", alpha = 0.5, color = "C0", label = "TOF < 4 ns (def.)")
+    # # draw histogram
+    # ax.bar(bin_centers, count, width = bin_widths, align = "center", alpha = 0.5, color = "C0", label = "TOF < 4 ns (def.)")
     # ax.fill_between(hist[1][:-1], hist[0], where = (hist[1][:-1] < 4), alpha = 0.5, color = "C0", label = "Suspect events")
 
     ax.set_xlabel(r"$\overline{\text{TOF}}$ [ns]")
@@ -1193,7 +1349,7 @@ for rho_min, rho_max in zip(rho_mins, rho_maxs):
     arr1_sus = tmtd_1[mask1 * bad_events_1 * suspect_events_1] - np.sqrt((xmtd_1[mask1 * bad_events_1 * suspect_events_1] - genPV.x)**2 + (ymtd_1[mask1 * bad_events_1 * suspect_events_1] - genPV.y)**2 + (zmtd_1[mask1 * bad_events_1 * suspect_events_1] - genPV.z)**2) / c - genPV.t#[ak.sum(bad_events_1, axis = 1) > 0]
     arr2_sus = tmtd_2[mask2 * bad_events_2 * suspect_events_2] - np.sqrt((xmtd_2[mask2 * bad_events_2 * suspect_events_2] - genPV.x)**2 + (ymtd_2[mask2 * bad_events_2 * suspect_events_2] - genPV.y)**2 + (zmtd_2[mask2 * bad_events_2 * suspect_events_2] - genPV.z)**2) / c - genPV.t#[ak.sum(bad_events_2, axis = 1) > 0]
     arr_suspect = ak.concatenate([ak.ravel(arr1_sus), ak.ravel(arr2_sus)])
-    ax.hist(arr_suspect.to_numpy(), bins = 30, range = (-0.1, 1), histtype = "step", label = "+ TOF < 4 ns", linestyle = "dashed", alpha = 0.6, color = "C0")
+    # ax.hist(arr_suspect.to_numpy(), bins = 30, range = (-0.1, 1), histtype = "step", label = "+ TOF < 4 ns", linestyle = "dashed", alpha = 0.6, color = "C0")
     ax.set_xlabel(r"$\Delta t$ [ns]")
     ax.set_ylabel("Density")
     ax.set_yscale("log")
@@ -1237,36 +1393,36 @@ for rho_min, rho_max in zip(rho_mins, rho_maxs):
     arr = arr_tmtd_awful - arr_tof_awful
     ax.hist(arr.to_numpy(), bins = 100, histtype = "step", label = r"+ $\Delta TOF > 0.1 ns$", range = (-0.6, 0.6))
 
-    # print event ID of awful events
-    print("Awful events:")
-    print(evts.event[(ak.sum(ak.sum(awful_events_1, axis = 2), axis = 1) + ak.sum(ak.sum(awful_events_2, axis = 2), axis = 1)) > 0])
-    # print cluster time of incriminated events
-    for evt in evts.event[(ak.sum(ak.sum(awful_events_1, axis = 2), axis = 1) + ak.sum(ak.sum(awful_events_2, axis = 2), axis = 1)) > 0][:5]:
-        print(f"Event {evt}:")
-        print(f"GenPV time: {genPV.t[evts.event == evt]}")
-        # print(f"MTD clusters: ele1 : {tmtd_1[evts.event == evt]}, ele2 : {tmtd_2[evts.event == evt]}")
-        print(f"MTD cluster types: ele1 : {ele1.typeClus[evts.event == evt]}, ele2 : {ele2.typeClus[evts.event == evt]}")
-        all_info_1 = ak.zip({"t" : tmtd_1[evts.event == evt], "x": xmtd_1[evts.event == evt], "y" : ymtd_1[evts.event == evt], "z" : zmtd_1[evts.event == evt]})
-        all_info_2 = ak.zip({"t" : tmtd_2[evts.event == evt], "x": xmtd_2[evts.event == evt], "y" : ymtd_2[evts.event == evt], "z" : zmtd_2[evts.event == evt]})
-        print("\tEle1:")
-        for event in all_info_1:
-            for j, photon in enumerate(event):
-                print(f"\tPhoton {j}:")
-                for idx, cluster in enumerate(photon):
-                    print(f"\t\tCluster {idx}: {cluster}")
-        print("\tEle2:")
-        for event in all_info_2:
-            for j, photon in enumerate(event):
-                print(f"\tPhoton {j}:")
-                for idx, cluster in enumerate(photon):
-                    print(f"\t\tCluster {idx}: {cluster}")
-        # print(f"MTD cluster position (x): ele1 : {xmtd_1[evts.event == evt]}, ele2 : {xmtd_2[evts.event == evt]}")
-        # print(f"MTD cluster position (y): ele1 : {ymtd_1[evts.event == evt]}, ele2 : {ymtd_2[evts.event == evt]}")
-        # print(f"MTD cluster position (z): ele1 : {zmtd_1[evts.event == evt]}, ele2 : {zmtd_2[evts.event == evt]}")
-        arr1 = tmtd_1[mask1 * bad_events_1] - np.sqrt((xmtd_1[mask1 * bad_events_1] - genPV.x)**2 + (ymtd_1[mask1 * bad_events_1] - genPV.y)**2 + (zmtd_1[mask1 * bad_events_1] - genPV.z)**2) / c - genPV.t#[ak.sum(bad_events_1, axis = 1) > 0]
-        arr2 = tmtd_2[mask2 * bad_events_2] - np.sqrt((xmtd_2[mask2 * bad_events_2] - genPV.x)**2 + (ymtd_2[mask2 * bad_events_2] - genPV.y)**2 + (zmtd_2[mask2 * bad_events_2] - genPV.z)**2) / c - genPV.t#[ak.sum(bad_events_2, axis = 1) > 0]
-        print(f"Uncorrected resolution: ele1 : {arr1[evts.event == evt]}, ele2 : {arr2[evts.event == evt]}")
-        print(f"TOF: ele1 = {tof1[evts.event == evt]}, ele2 = {tof2[evts.event == evt]}")
+    # # print event ID of awful events
+    # print("Awful events:")
+    # print(evts.event[(ak.sum(ak.sum(awful_events_1, axis = 2), axis = 1) + ak.sum(ak.sum(awful_events_2, axis = 2), axis = 1)) > 0])
+    # # print cluster time of incriminated events
+    # for evt in evts.event[(ak.sum(ak.sum(awful_events_1, axis = 2), axis = 1) + ak.sum(ak.sum(awful_events_2, axis = 2), axis = 1)) > 0][:5]:
+    #     print(f"Event {evt}:")
+    #     print(f"GenPV time: {genPV.t[evts.event == evt]}")
+    #     # print(f"MTD clusters: ele1 : {tmtd_1[evts.event == evt]}, ele2 : {tmtd_2[evts.event == evt]}")
+    #     print(f"MTD cluster types: ele1 : {ele1.typeClus[evts.event == evt]}, ele2 : {ele2.typeClus[evts.event == evt]}")
+    #     all_info_1 = ak.zip({"t" : tmtd_1[evts.event == evt], "x": xmtd_1[evts.event == evt], "y" : ymtd_1[evts.event == evt], "z" : zmtd_1[evts.event == evt]})
+    #     all_info_2 = ak.zip({"t" : tmtd_2[evts.event == evt], "x": xmtd_2[evts.event == evt], "y" : ymtd_2[evts.event == evt], "z" : zmtd_2[evts.event == evt]})
+    #     print("\tEle1:")
+    #     for event in all_info_1:
+    #         for j, photon in enumerate(event):
+    #             print(f"\tPhoton {j}:")
+    #             for idx, cluster in enumerate(photon):
+    #                 print(f"\t\tCluster {idx}: {cluster}")
+    #     print("\tEle2:")
+    #     for event in all_info_2:
+    #         for j, photon in enumerate(event):
+    #             print(f"\tPhoton {j}:")
+    #             for idx, cluster in enumerate(photon):
+    #                 print(f"\t\tCluster {idx}: {cluster}")
+    #     # print(f"MTD cluster position (x): ele1 : {xmtd_1[evts.event == evt]}, ele2 : {xmtd_2[evts.event == evt]}")
+    #     # print(f"MTD cluster position (y): ele1 : {ymtd_1[evts.event == evt]}, ele2 : {ymtd_2[evts.event == evt]}")
+    #     # print(f"MTD cluster position (z): ele1 : {zmtd_1[evts.event == evt]}, ele2 : {zmtd_2[evts.event == evt]}")
+    #     arr1 = tmtd_1[mask1 * bad_events_1] - np.sqrt((xmtd_1[mask1 * bad_events_1] - genPV.x)**2 + (ymtd_1[mask1 * bad_events_1] - genPV.y)**2 + (zmtd_1[mask1 * bad_events_1] - genPV.z)**2) / c - genPV.t#[ak.sum(bad_events_1, axis = 1) > 0]
+    #     arr2 = tmtd_2[mask2 * bad_events_2] - np.sqrt((xmtd_2[mask2 * bad_events_2] - genPV.x)**2 + (ymtd_2[mask2 * bad_events_2] - genPV.y)**2 + (zmtd_2[mask2 * bad_events_2] - genPV.z)**2) / c - genPV.t#[ak.sum(bad_events_2, axis = 1) > 0]
+    #     print(f"Uncorrected resolution: ele1 : {arr1[evts.event == evt]}, ele2 : {arr2[evts.event == evt]}")
+    #     print(f"TOF: ele1 = {tof1[evts.event == evt]}, ele2 = {tof2[evts.event == evt]}")
 
     ## Geometry of bad clusters
     # plot x_mtd - gen PV x
@@ -1445,13 +1601,13 @@ for rho_min, rho_max in zip(rho_mins, rho_maxs):
     # deltaPhi2 = angle_to_mpi_pi(np.arctan2(ymtd_2[mask2 * bad_events_2], xmtd_2[mask2 * bad_events_2])[bad_photons_2] - np.arctan2(conv_y_2, conv_x_2))
     arr = ak.concatenate([ak.ravel(deltaPhi1), ak.ravel(deltaPhi2)])
 
-    ax.hist(arr.to_numpy(), bins = 50, histtype = "step", label = r"$|\Delta\phi| < 0.05$")
+    ax.hist(arr.to_numpy(), bins = 50, range = [-0.05, 0.05], histtype = "step", label = r"$|\Delta\phi| < 0.05$")
 
     deltaPhi1_awful = angle_to_mpi_pi(np.arctan2(ymtd_1[mask1 * bad_events_1][awful_events_1], xmtd_1[mask1 * bad_events_1][awful_events_1]) - np.arctan2(conv_y, conv_x))
     deltaPhi2_awful = angle_to_mpi_pi(np.arctan2(ymtd_2[mask2 * bad_events_2][awful_events_2], xmtd_2[mask2 * bad_events_2][awful_events_2]) - np.arctan2(conv_y, conv_x))
 
     arr_awful = ak.concatenate([ak.ravel(deltaPhi1_awful), ak.ravel(deltaPhi2_awful)])
-    ax.hist(arr_awful.to_numpy(), bins = 50, histtype = "step", label = r"+ $\Delta TOF > 0.1 ns$", linestyle = "dashed", alpha = 0.6, color = "C0")
+    ax.hist(arr_awful.to_numpy(), bins = 50, range = [-0.05, 0.05], histtype = "step", label = r"+ $\Delta TOF > 0.1 ns$", linestyle = "dashed", alpha = 0.6, color = "C0")
 
     ax.set_xlabel(r"$\Delta\phi(conv, MTD)$")
     ax.set_ylabel("Entries")
@@ -1462,18 +1618,29 @@ for rho_min, rho_max in zip(rho_mins, rho_maxs):
     ### Conversion position VS MTD position: breakdown, deltaR
     ax = axs[5, 1]
 
-    deltaR1 = np.sqrt((xmtd_1[mask1 * bad_events_1] - conv_x)**2 + (ymtd_1[mask1 * bad_events_1] - conv_y)**2)
-    deltaR2 = np.sqrt((xmtd_2[mask2 * bad_events_2] - conv_x)**2 + (ymtd_2[mask2 * bad_events_2] - conv_y)**2)
-    # deltaR1 = np.sqrt((xmtd_1[mask1 * bad_events_1][bad_photons_1] - conv_x_1)**2 + (ymtd_1[mask1 * bad_events_1][bad_photons_1] - conv_y_1)**2)
-    # deltaR2 = np.sqrt((xmtd_2[mask2 * bad_events_2][bad_photons_2] - conv_x_2)**2 + (ymtd_2[mask2 * bad_events_2][bad_photons_2] - conv_y_2)**2)
+    mtd_r1 = np.sqrt(xmtd_1[mask1 * bad_events_1]**2 + ymtd_1[mask1 * bad_events_1]**2)
+    conv_r1 = np.sqrt(conv_x**2 + conv_y**2)
+    mtd_r2 = np.sqrt(xmtd_2[mask2 * bad_events_2]**2 + ymtd_2[mask2 * bad_events_2]**2)
+    conv_r2 = np.sqrt(conv_x**2 + conv_y**2)
+
+    deltaR1 = mtd_r1 - conv_r1
+    deltaR2 = mtd_r2 - conv_r2
+    # deltaR1 = np.sqrt((xmtd_1[mask1 * bad_events_1] - conv_x)**2 + (ymtd_1[mask1 * bad_events_1] - conv_y)**2)
+    # deltaR2 = np.sqrt((xmtd_2[mask2 * bad_events_2] - conv_x)**2 + (ymtd_2[mask2 * bad_events_2] - conv_y)**2)
     arr = ak.concatenate([ak.ravel(deltaR1), ak.ravel(deltaR2)])
+    ax.hist(arr.to_numpy(), bins = 50, range = [0, 1.5], histtype = "step", label = r"$|\Delta\phi| < 0.05$")
 
-    ax.hist(arr.to_numpy(), bins = 50, histtype = "step", label = r"$|\Delta\phi| < 0.05$")
-    deltaR1_awful = np.sqrt((xmtd_1[mask1 * bad_events_1][awful_events_1] - conv_x)**2 + (ymtd_1[mask1 * bad_events_1][awful_events_1] - conv_y)**2)
-    deltaR2_awful = np.sqrt((xmtd_2[mask2 * bad_events_2][awful_events_2] - conv_x)**2 + (ymtd_2[mask2 * bad_events_2][awful_events_2] - conv_y)**2)
+    mtd_r1_awful = np.sqrt(xmtd_1[mask1 * bad_events_1][awful_events_1]**2 + ymtd_1[mask1 * bad_events_1][awful_events_1]**2)
+    conv_r1_awful = np.sqrt(conv_x**2 + conv_y**2)
+    mtd_r2_awful = np.sqrt(xmtd_2[mask2 * bad_events_2][awful_events_2]**2 + ymtd_2[mask2 * bad_events_2][awful_events_2]**2)
+    conv_r2_awful = np.sqrt(conv_x**2 + conv_y**2)
+    deltaR1_awful = mtd_r1_awful - conv_r1_awful
+    deltaR2_awful = mtd_r2_awful - conv_r2_awful
+    # deltaR1_awful = np.sqrt((xmtd_1[mask1 * bad_events_1][awful_events_1] - conv_x)**2 + (ymtd_1[mask1 * bad_events_1][awful_events_1] - conv_y)**2)
+    # deltaR2_awful = np.sqrt((xmtd_2[mask2 * bad_events_2][awful_events_2] - conv_x)**2 + (ymtd_2[mask2 * bad_events_2][awful_events_2] - conv_y)**2)
     arr_awful = ak.concatenate([ak.ravel(deltaR1_awful), ak.ravel(deltaR2_awful)])
+    ax.hist(arr_awful.to_numpy(), bins = 50, range = [0, 1.5], histtype = "step", label = r"+ $\Delta TOF > 0.1 ns$", linestyle = "dashed", alpha = 0.6, color = "C0")
 
-    ax.hist(arr_awful.to_numpy(), bins = 50, histtype = "step", label = r"+ $\Delta TOF > 0.1 ns$", linestyle = "dashed", alpha = 0.6, color = "C0")
     ax.set_xlabel(r"$\Delta R(conv, MTD)$ [cm]")
     ax.set_ylabel("Entries")
     ax.grid()
@@ -1486,16 +1653,36 @@ for rho_min, rho_max in zip(rho_mins, rho_maxs):
     deltaZ2 = np.abs(zmtd_2[mask2 * bad_events_2] - conv_z)
     # deltaZ1 = np.abs(zmtd_1[mask1 * bad_events_1][bad_photons_1] - conv_z_1)
     # deltaZ2 = np.abs(zmtd_2[mask2 * bad_events_2][bad_photons_2] - conv_z_2)
-
     arr = ak.concatenate([ak.ravel(deltaZ1), ak.ravel(deltaZ2)])
     ax.hist(arr.to_numpy(), bins = 50, range = (0, 20), histtype = "step", label = r"$|\Delta\phi| < 0.05$")
+
     deltaZ1_awful = np.abs(zmtd_1[mask1 * bad_events_1][awful_events_1] - conv_z)
     deltaZ2_awful = np.abs(zmtd_2[mask2 * bad_events_2][awful_events_2] - conv_z)
     arr_awful = ak.concatenate([ak.ravel(deltaZ1_awful), ak.ravel(deltaZ2_awful)])
     ax.hist(arr_awful.to_numpy(), bins = 50, range = (0, 20), histtype = "step", label = r"+ $\Delta TOF > 0.1 ns$", linestyle = "dashed", alpha = 0.6, color = "C0")
+    
     ax.set_xlabel(r"$\Delta z(conv, MTD)$ [cm]")
     ax.set_ylabel("Entries")
     ax.grid()   
+    ax.legend()
+    ax.set_yscale("log")
+
+    # deltaEta
+    ax = axs[6, 0]
+    
+    deltaEta1 = np.arcsinh(zmtd_1[mask1 * bad_events_1] / np.sqrt(xmtd_1[mask1 * bad_events_1]**2 + ymtd_1[mask1 * bad_events_1]**2)) - np.arcsinh(conv_z / np.sqrt(conv_x**2 + conv_y**2))
+    deltaEta2 = np.arcsinh(zmtd_2[mask2 * bad_events_2] / np.sqrt(xmtd_2[mask2 * bad_events_2]**2 + ymtd_2[mask2 * bad_events_2]**2)) - np.arcsinh(conv_z / np.sqrt(conv_x**2 + conv_y**2))
+    arr = ak.concatenate([ak.ravel(deltaEta1), ak.ravel(deltaEta2)])
+    ax.hist(arr.to_numpy(), bins = 50, range = [-0.12, 0.12], histtype = "step", label = r"$|\Delta\phi| < 0.05$")
+
+    deltaEta1_awful = np.arcsinh(zmtd_1[mask1 * bad_events_1][awful_events_1] / np.sqrt(xmtd_1[mask1 * bad_events_1][awful_events_1]**2 + ymtd_1[mask1 * bad_events_1][awful_events_1]**2)) - np.arcsinh(conv_z / np.sqrt(conv_x**2 + conv_y**2))
+    deltaEta2_awful = np.arcsinh(zmtd_2[mask2 * bad_events_2][awful_events_2] / np.sqrt(xmtd_2[mask2 * bad_events_2][awful_events_2]**2 + ymtd_2[mask2 * bad_events_2][awful_events_2]**2)) - np.arcsinh(conv_z / np.sqrt(conv_x**2 + conv_y**2))
+    arr_awful = ak.concatenate([ak.ravel(deltaEta1_awful), ak.ravel(deltaEta2_awful)])
+    ax.hist(arr_awful.to_numpy(), bins = 50, range = [-0.12, 0.12], histtype = "step", label = r"+ $\Delta TOF > 0.1 ns$", linestyle = "dashed", alpha = 0.6, color = "C0")
+
+    ax.set_xlabel(r"$\Delta\eta(conv, MTD)$")
+    ax.set_ylabel("Entries")
+    ax.grid()
     ax.legend()
     ax.set_yscale("log")
 
@@ -1608,28 +1795,111 @@ for rho_min, rho_max in zip(rho_mins, rho_maxs):
     ax.set_xlim(-200, 200)
     ax.set_ylim(115, 116.8)
 
-    ### Plot deltaX(photon, MTD) quantities
-    # deltaEta
-    ax = axs[6, 0]
-    
-    deltaEta1 = np.arcsinh(zmtd_1[mask1 * bad_events_1] / np.sqrt(xmtd_1[mask1 * bad_events_1]**2 + ymtd_1[mask1 * bad_events_1]**2)) - np.arcsinh(conv_z / np.sqrt(conv_x**2 + conv_y**2))
-    deltaEta2 = np.arcsinh(zmtd_2[mask2 * bad_events_2] / np.sqrt(xmtd_2[mask2 * bad_events_2]**2 + ymtd_2[mask2 * bad_events_2]**2)) - np.arcsinh(conv_z / np.sqrt(conv_x**2 + conv_y**2))
-    arr = ak.concatenate([ak.ravel(deltaEta1), ak.ravel(deltaEta2)])
-    ax.hist(arr.to_numpy(), bins = 50, histtype = "step", label = r"$|\Delta\phi| < 0.05$")
-
-    deltaEta1_awful = np.arcsinh(zmtd_1[mask1 * bad_events_1][awful_events_1] / np.sqrt(xmtd_1[mask1 * bad_events_1][awful_events_1]**2 + ymtd_1[mask1 * bad_events_1][awful_events_1]**2)) - np.arcsinh(conv_z / np.sqrt(conv_x**2 + conv_y**2))
-    deltaEta2_awful = np.arcsinh(zmtd_2[mask2 * bad_events_2][awful_events_2] / np.sqrt(xmtd_2[mask2 * bad_events_2][awful_events_2]**2 + ymtd_2[mask2 * bad_events_2][awful_events_2]**2)) - np.arcsinh(conv_z / np.sqrt(conv_x**2 + conv_y**2))
-    arr_awful = ak.concatenate([ak.ravel(deltaEta1_awful), ak.ravel(deltaEta2_awful)])
-    ax.hist(arr_awful.to_numpy(), bins = 50, histtype = "step", label = r"+ $\Delta TOF > 0.1 ns$", linestyle = "dashed", alpha = 0.6, color = "C0")
-
-    ax.set_xlabel(r"$\Delta\eta(conv, MTD)$")
-    ax.set_ylabel("Entries")
+    ### Plot ENERGY variables
+    ax = axs[6, 1]
+    plot_range = [0, 25]
+    emtd_1 = ele1.energyClus[mask1 * bad_events_1]
+    emtd_2 = ele2.energyClus[mask2 * bad_events_2]
+    arr = ak.concatenate([ak.ravel(emtd_1), ak.ravel(emtd_2)])
+    ax.hist(arr.to_numpy(), bins = 30, range = plot_range, histtype = "step", label = r"$|\Delta\phi| < 0.05$", density = True)
+    emtd_1_awful = ele1.energyClus[mask1 * bad_events_1][awful_events_1]
+    emtd_2_awful = ele2.energyClus[mask2 * bad_events_2][awful_events_2]
+    arr_awful = ak.concatenate([ak.ravel(emtd_1_awful), ak.ravel(emtd_2_awful)])
+    ax.hist(arr_awful.to_numpy(), bins = 30, range = plot_range, histtype = "step", label = r"+ $\Delta TOF > 0.1 ns$", linestyle = "dashed", alpha = 0.6, color = "C0", density = True)
+    ax.set_title("Cluster energy")
+    ax.set_xlabel(r"$E_\text{MTD}$ [MeV]")
+    # ax.set_ylabel("Entries")
+    ax.set_ylabel("Density")
     ax.grid()
     ax.legend()
     ax.set_yscale("log")
+
+    ### Plot z std. dev. (cluster extension)
+    for var, ax in zip(["tStdClus", "xStdClus", "yStdClus", "zStdClus"], axs.flatten()[20:20+4]):        
+        plot_range = [0, 0.15]
+        if var == "zStdClus":
+            plot_range = [0, 0.2]
+        elif var == "xStdClus":
+            plot_range = [0, 1]
+        elif var == "yStdClus":
+            plot_range = [0, 0.2]
+        arr1 = ele1[var][mask1 * bad_events_1]
+        arr2 = ele2[var][mask2 * bad_events_2]
+        arr = ak.concatenate([ak.ravel(arr1), ak.ravel(arr2)])
+        ax.hist(arr.to_numpy(), bins = 30, range = plot_range, histtype = "step", label = r"$|\Delta\phi| < 0.05$", density = True)
+        arr1_awful = ele1[var][mask1 * bad_events_1][awful_events_1]
+        arr2_awful = ele2[var][mask2 * bad_events_2][awful_events_2]
+        arr_awful = ak.concatenate([ak.ravel(arr1_awful), ak.ravel(arr2_awful)])
+        ax.hist(arr_awful.to_numpy(), bins = 30, range = plot_range, histtype = "step", label = r"+ $\Delta TOF > 0.1 ns$", linestyle = "dashed", alpha = 0.6, color = "C0", density = True)
+        ax.set_title(f"Std. dev. of hits {var[0]} in cluster")
+        ax.set_xlabel(f"$\sigma_{var[0]}$ [cm]")
+        # ax.set_ylabel("Entries")
+        ax.set_ylabel("Density")
+        ax.grid()
+        ax.legend()
+        ax.set_yscale("log")
     
-    fig.savefig(ff{local_folder}/"debugging_{rho_min}To{rho_max}.png")
-    fig.savefig(ff{local_folder}/"debugging_{rho_min}To{rho_max}.pdf")
+    ### Plot z std. dev. AMONG clusters
+    for var, ax in zip(["tClus", "xClus", "yClus", "zClus"], axs.flatten()[24:24+4]):        
+        plot_range = [0, 5]
+        # plot_range = [0, 0.15]
+        # if var == "zClus":
+        #     plot_range = [0, 0.2]
+        # elif var == "xClus":
+        #     plot_range = [0, 1]
+        # elif var == "yClus":
+        #     plot_range = [0, 0.2]
+        arr1 = ak.std(ele1[var][mask1 * bad_events_1], axis = 2)
+        arr2 = ak.std(ele2[var][mask2 * bad_events_2], axis = 2)
+        arr = ak.concatenate([ak.ravel(arr1), ak.ravel(arr2)])
+        ax.hist(arr.to_numpy(), bins = 30, range = plot_range, histtype = "step", label = r"$|\Delta\phi| < 0.05$")
+        arr1_awful = ak.std(ele1[var][mask1 * bad_events_1][awful_events_1], axis = 2)
+        arr2_awful = ak.std(ele2[var][mask2 * bad_events_2][awful_events_2], axis = 2)
+        arr_awful = ak.concatenate([ak.ravel(arr1_awful), ak.ravel(arr2_awful)])
+        ax.hist(arr_awful.to_numpy(), bins = 30, range = plot_range, histtype = "step", label = r"+ $\Delta TOF > 0.1 ns$", linestyle = "dashed", alpha = 0.6, color = "C0")
+        ax.set_title(f"Std. dev. of cluster {var[0]} per electron")
+        ax.set_xlabel(f"$\sigma_{var[0]}$ [cm]")
+        ax.set_ylabel("Entries")
+        # ax.set_ylabel("Density")
+        ax.grid()
+        ax.legend()
+        ax.set_yscale("log")
+
+    ax = axs[9, 1]
+    # #hits/cluster 
+    arr1 = ele1.nHitsClus[mask1 * bad_events_1]
+    arr2 = ele2.nHitsClus[mask2 * bad_events_2]
+    arr = ak.concatenate([ak.ravel(arr1), ak.ravel(arr2)])
+    ax.hist(arr.to_numpy(), bins = 6, range = (-0.5, 5.5), histtype = "step", label = r"$|\Delta\phi| < 0.05$", density = True)
+    arr1_awful = ele1.nHitsClus[mask1 * bad_events_1][awful_events_1]
+    arr2_awful = ele2.nHitsClus[mask2 * bad_events_2][awful_events_2]
+    arr_awful = ak.concatenate([ak.ravel(arr1_awful), ak.ravel(arr2_awful)])
+    ax.hist(arr_awful.to_numpy(), bins = 6, range = (-0.5, 5.5), histtype = "step", label = r"+ $\Delta TOF > 0.1 ns$", linestyle = "dashed", alpha = 0.6, color = "C0", density = True)
+    ax.set_title("Hits per cluster")
+    ax.set_xlabel("Hits")
+    ax.set_ylabel("Density")
+    ax.grid()
+    ax.legend()
+
+    ax = axs[9, 2]
+    # #clusters/electron
+    arr1 = ak.num(ele1.tClus[mask1 * bad_events_1], axis = 2)
+    arr2 = ak.num(ele2.tClus[mask2 * bad_events_2], axis = 2)
+    arr = ak.concatenate([ak.ravel(arr1), ak.ravel(arr2)])
+    ax.hist(arr.to_numpy(), bins = 11, range = (-0.5, 10.5), histtype = "step", label = r"$|\Delta\phi| < 0.05$", density = True)
+    arr1_awful = ak.num(ele1.tClus[mask1 * bad_events_1][awful_events_1], axis = 2)
+    arr2_awful = ak.num(ele2.tClus[mask2 * bad_events_2][awful_events_2], axis = 2)
+    arr_awful = ak.concatenate([ak.ravel(arr1_awful), ak.ravel(arr2_awful)])
+    ax.hist(arr_awful.to_numpy(), bins = 11, range = (-0.5, 10.5), histtype = "step", label = r"+ $\Delta TOF > 0.1 ns$", linestyle = "dashed", alpha = 0.6, color = "C0", density = True)
+    ax.set_title("Clusters per electron")
+    ax.set_xlabel("Clusters")
+    ax.set_ylabel("Density")
+    ax.grid()
+    ax.legend()
+    ax.set_yscale("log")
+
+    fig.savefig(f"{local_folder}/debugging_{rho_min}To{rho_max}.png")
+    fig.savefig(f"{local_folder}/debugging_{rho_min}To{rho_max}.pdf")
 
 # ---------------------
 

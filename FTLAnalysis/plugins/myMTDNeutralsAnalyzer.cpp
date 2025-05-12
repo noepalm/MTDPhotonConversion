@@ -78,6 +78,20 @@ using namespace std;
 
 bool DEBUG = false;
 
+// ------ UTILS ------ //
+std::pair<float, float> mean_stddev(std::vector<float>& v) {
+    float sum = std::accumulate(v.begin(), v.end(), 0.0);
+    float mean = sum / v.size();
+    
+    std::vector<float> diff(v.size());
+    std::transform(v.begin(), v.end(), diff.begin(),
+                   [mean](float value){return value - mean;});
+    float sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
+    float std = std::sqrt(sq_sum / v.size());
+
+    return std::pair<float, float>(mean, std);
+}
+
 struct ConvertedPhoton {
     TrackingParticleRef genPhoton;
     vector<int> genElectron_idxs;
@@ -391,7 +405,7 @@ void myMTDNeutralsAnalyzer::analyze(edm::Event const& iEvent, edm::EventSetup co
         cout << "Event " << iEvent.id().event() << ":" << endl;
         for(size_t i = 0; i < trackingParticles.size(); i++){
             auto& tp = trackingParticles[i];
-            cout << "tp idx = " << i << ": pdgId = " << tp.pdgId() << ", status = " << tp.status() << ", pt = " << tp.pt() << ", eta = " << tp.eta() << ", phi = " << tp.phi() << endl;
+            cout << "tp idx = " << i << ": pdgId = " << tp.pdgId() << ", status = " << tp.status() << ", E = " << tp.energy() << ", pt = " << tp.pt() << ", eta = " << tp.eta() << ", phi = " << tp.phi() << endl;
             cout << "           t at vtx = " << tp.parentVertex()->position().t() * 1e9 << " ns" << std::endl;
 
             // if tp has decay vertex, print daughter tracks
@@ -541,12 +555,18 @@ void myMTDNeutralsAnalyzer::analyze(edm::Event const& iEvent, edm::EventSetup co
 
             ele_idxs.push_back(ele_idx++);
 
-            vector<float> cluster_t = {};
             vector<int> cluster_type = {};
+            vector<int> cluster_nHits = {};
+            vector<float> cluster_t = {};
             vector<float> cluster_x = {};
             vector<float> cluster_y = {};
             vector<float> cluster_z = {};
             vector<float> cluster_energy = {};
+            vector<float> cluster_tStd = {};
+            vector<float> cluster_xStd = {};
+            vector<float> cluster_yStd = {};
+            vector<float> cluster_zStd = {};
+            vector<float> cluster_energyStd = {};
 
             // retrieve matched MTDSimLayerCluster for each electron
             if(tp2SimAssociationMapHandle_->find(electron) != tp2SimAssociationMapHandle_->end()){
@@ -573,7 +593,42 @@ void myMTDNeutralsAnalyzer::analyze(edm::Event const& iEvent, edm::EventSetup co
 
                     // save energy too
                     float simClusEnergy = convertUnitsTo(0.001_MeV, simCluster->simLCEnergy()); // GeV --> MeV                    
-                    cluster_energy.push_back(simClusEnergy);   
+                    cluster_energy.push_back(simClusEnergy);
+
+                    // INFO ON HITS AND CLUSTER EXTENSION
+                    // retrieve hits and times, hits and positions
+                    std::vector<std::pair<uint64_t, LocalPoint>> hits_and_positions = simCluster->hits_and_positions();
+                    std::vector<std::pair<uint64_t, float>> hits_and_times = simCluster->hits_and_times();
+                    std::vector<std::pair<uint64_t, float>> hits_and_energies = simCluster->hits_and_energies();
+                    
+                    // create vector of x, y, z, t from above
+                    std::vector<float> hits_times;
+                    std::transform(begin(hits_and_times), end(hits_and_times),
+                                   std::back_inserter(hits_times),
+                                   [](auto const& pair){return pair.second;});
+                    std::vector<float> hits_x, hits_y, hits_z;
+                    std::transform(begin(hits_and_positions), end(hits_and_positions),
+                                   std::back_inserter(hits_x),
+                                   [](auto const& pair){return pair.second.x();});                    
+                    std::transform(begin(hits_and_positions), end(hits_and_positions),
+                                   std::back_inserter(hits_y),
+                                   [](auto const& pair){return pair.second.y();});
+                    std::transform(begin(hits_and_positions), end(hits_and_positions),
+                                   std::back_inserter(hits_z),
+                                   [](auto const& pair){return pair.second.z();});
+                    std::vector<float> hits_energies;
+                    std::transform(begin(hits_and_energies), end(hits_and_energies),
+                                   std::back_inserter(hits_energies),
+                                   [](auto const& pair){return pair.second;});
+                    
+                    // compute and store std dev 
+                    cluster_tStd.push_back(mean_stddev(hits_times).second);
+                    cluster_xStd.push_back(mean_stddev(hits_x).second);
+                    cluster_yStd.push_back(mean_stddev(hits_y).second);
+                    cluster_zStd.push_back(mean_stddev(hits_z).second);
+                    cluster_energyStd.push_back(mean_stddev(hits_energies).second);
+
+                    cluster_nHits.push_back(int(hits_times.size()));
                 }   
             }
 
@@ -583,8 +638,14 @@ void myMTDNeutralsAnalyzer::analyze(edm::Event const& iEvent, edm::EventSetup co
                 cluster_x.push_back(-999.);
                 cluster_y.push_back(-999.);
                 cluster_z.push_back(-999.);
-                cluster_type.push_back(-999.);
                 cluster_energy.push_back(-999.);
+                cluster_type.push_back(-999.);
+                cluster_tStd.push_back(-999.);
+                cluster_xStd.push_back(-999.);
+                cluster_yStd.push_back(-999.);
+                cluster_zStd.push_back(-999.);
+                cluster_energyStd.push_back(-999.);
+                cluster_nHits.push_back(-999);
             }
 
             // sort clusters by time
@@ -596,24 +657,36 @@ void myMTDNeutralsAnalyzer::analyze(edm::Event const& iEvent, edm::EventSetup co
             std::sort(sortedClusters.begin(), sortedClusters.end(), [](const std::pair<float, int>& a, const std::pair<float, int>& b) { return a.first < b.first; });
             // reorder clusters
             std::vector<float> sorted_cluster_t, sorted_cluster_x, sorted_cluster_y, sorted_cluster_z, sorted_cluster_energy;
-            std::vector<int> sorted_cluster_type;
+            std::vector<float> sorted_cluster_tStd, sorted_cluster_xStd, sorted_cluster_yStd, sorted_cluster_zStd, sorted_cluster_energyStd;
+            std::vector<int> sorted_cluster_type, sorted_cluster_nhits;
             for(size_t j = 0; j < sortedClusters.size(); j++){
                 int idx = sortedClusters[j].second;
                 sorted_cluster_t.push_back(cluster_t[idx]);
                 sorted_cluster_x.push_back(cluster_x[idx]);
                 sorted_cluster_y.push_back(cluster_y[idx]);
                 sorted_cluster_z.push_back(cluster_z[idx]);
-                sorted_cluster_type.push_back(cluster_type[idx]);
                 sorted_cluster_energy.push_back(cluster_energy[idx]);
+                sorted_cluster_type.push_back(cluster_type[idx]);
+                sorted_cluster_tStd.push_back(cluster_tStd[idx]);
+                sorted_cluster_xStd.push_back(cluster_xStd[idx]);
+                sorted_cluster_yStd.push_back(cluster_yStd[idx]);
+                sorted_cluster_zStd.push_back(cluster_zStd[idx]);
+                sorted_cluster_energyStd.push_back(cluster_energyStd[idx]);
+                sorted_cluster_nhits.push_back(cluster_nHits[idx]);
             }
 
             outTree_.GENElectron_tClus->push_back(sorted_cluster_t);
             outTree_.GENElectron_xClus->push_back(sorted_cluster_x);
             outTree_.GENElectron_yClus->push_back(sorted_cluster_y);
             outTree_.GENElectron_zClus->push_back(sorted_cluster_z);
-            outTree_.GENElectron_typeClus->push_back(sorted_cluster_type);
             outTree_.GENElectron_energyClus->push_back(sorted_cluster_energy);
-
+            outTree_.GENElectron_tStdClus->push_back(sorted_cluster_tStd);
+            outTree_.GENElectron_xStdClus->push_back(sorted_cluster_xStd);
+            outTree_.GENElectron_yStdClus->push_back(sorted_cluster_yStd);
+            outTree_.GENElectron_zStdClus->push_back(sorted_cluster_zStd);
+            outTree_.GENElectron_energyStdClus->push_back(sorted_cluster_energyStd);
+            outTree_.GENElectron_typeClus->push_back(sorted_cluster_type);
+            outTree_.GENElectron_nHitsClus->push_back(sorted_cluster_nhits);
         }    
 
         outTree_.GENConvertedPhoton_eleIdxs->push_back(ele_idxs);
