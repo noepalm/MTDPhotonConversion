@@ -102,7 +102,7 @@ files = []
 if options.sample == 'lowPt':
     # 0.1-10 GeV SingleGammaFlat sample (self-produced)
     # files = [f"root://xrootd-cms.infn.it///store/user/npalmeri/MTDPhotonReco/crab_MTDPhotonReco/CRAB_UserFiles/SingleGammaFlatPt0p1To10_Run4D110_aging1000_noPU_MTDPhotonReco/250307_134457/0000/step3_{i}.root" for i in range(1, 11)]
-    files = [f"file:/eos/home-n/npalmeri/ntuples/MTD/PhotonReco/crab_MTDPhotonReco/CRAB_UserFiles/SingleGammaFlatPt0p1To10_Run4D110_aging1000_noPU_MTDPhotonReco/250424_164835/step3_MINI.root"]
+    files = [f"file:/eos/home-n/npalmeri/ntuples/MTD/PhotonReco/crab_MTDPhotonReco/CRAB_UserFiles/SingleGammaFlatPt0p1To10_Run4D110_aging1000_noPU_MTDPhotonReco/250424_164835/0000/step3_{i}.root" for i in range(1, 11)]
 elif options.sample == 'highPt':
     # 8-150 GeV SingleGammaFlat sample (just 1k produced)
     files = [f"root://xrootd-cms.infn.it///store/user/npalmeri/MTDPhotonReco/crab_MTDPhotonReco/CRAB_UserFiles/SingleGammaFlatPt8To150_Run4D110_aging1000_noPU_MTDPhotonReco/250307_142923/0000/step3_{i}.root" for i in range(1, 21)]
@@ -167,7 +167,7 @@ process.source = cms.Source(
 #process.source.duplicateCheckMode = cms.untracked.string('noDuplicateCheck')
 
 # Analyzer
-process.load('PrecisionTiming.FTLAnalysis.myMTDNeutralsAnalyzer_cfi')
+process.load('MTDPhotonConversion.FTLAnalysis.myMTDNeutralsAnalyzer_cfi')
 MTDDumper = process.MTDNeutralsAnalyzer
 MTDDumper.storeClusters = options.storeclusters
 

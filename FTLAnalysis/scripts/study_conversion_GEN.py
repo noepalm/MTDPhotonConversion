@@ -44,12 +44,13 @@ os.system("touch conversions.log")
 f = open("conversions.log", "w")
 
 # create local plot output folder
-local_folder = "plots/GEN"
+local_folder = "plots/GEN_fabiofix"
 os.system("mkdir -p %s" % local_folder)
 
 # Load data
 if args.use_low_pt:
-    fname = "/eos/home-n/npalmeri/MTD_photonReco/CMSSW_15_0_0_pre3/src/PrecisionTiming/FTLAnalysis/test/lowPtSample.root"
+    # fname = "/eos/home-n/npalmeri/MTD_photonReco/CMSSW_15_0_0_pre3/src/PrecisionTiming/FTLAnalysis/test/lowPtSample.root"
+    fname = "/eos/home-n/npalmeri/MTD_photonReco/CMSSW_15_1_0_pre2_fabioFix/src/MTDPhotonConversion/FTLAnalysis/test/lowPtSample_fabioFix.root"
     # fname = "/eos/home-n/npalmeri/MTD_photonReco/CMSSW_15_0_0_pre3/src/PrecisionTiming/FTLAnalysis/test/test.root"
 else:
     fname = "/eos/home-n/npalmeri/MTD_photonReco/CMSSW_15_0_0_pre3/src/PrecisionTiming/FTLAnalysis/test/highPtSample.root"
@@ -1035,8 +1036,11 @@ ax.legend()
 
 ax = axs[1]
 # do profile
-for rho_min, rho_max in zip(rho_range[:-1], rho_range[1:]):
-    phi_range = np.linspace(-0.5, 0.5, 10)
+for i, (rho_min, rho_max) in enumerate(zip(rho_range[:-1], rho_range[1:])):
+    step = 0.1 if i < 3 else 0.142
+    phi_low = -0.5 + step * i
+    phi_high = 0.5 - step * i
+    phi_range = np.linspace(phi_low, phi_high, 20)
 
     xs = []
     xs_err = []
@@ -1084,8 +1088,11 @@ results = {}
 
 parabola = lambda x, a, b, c : a * x**2 + b * x + c
 
-for ax, rho_min, rho_max in zip(axs, rho_range[:-1], rho_range[1:]):
-    phi_range = np.linspace(-0.5, 0.5, 20)
+for i, (ax, rho_min, rho_max) in enumerate(zip(axs, rho_range[:-1], rho_range[1:])):
+    step = 0.1 if i < 3 else 0.142
+    phi_low = -0.5 + step * i
+    phi_high = 0.5 - step * i
+    phi_range = np.linspace(phi_low, phi_high, 20)
 
     xs = []
     xs_err = []
@@ -1155,14 +1162,14 @@ for ax, rho_min, rho_max in zip(axs, rho_range[:-1], rho_range[1:]):
     results[(rho_min, rho_max)] = (popt, perr)
 
     # plot 
-    xfit = np.linspace(-0.5, 0.5, 1000)
+    xfit = np.linspace(phi_low, phi_high, 1000)
     yfit = parabola(xfit, *popt)
     ax.plot(xfit, yfit, label = f"Fit: {popt[0]:.3g}x^2 + {popt[1]:.3g}x + {popt[2]:.3g}", color = "red")
 
     ax.set_xlabel(r"$\Delta \phi$")
     ax.set_ylabel(r"$\Delta TOF$ [ns]")
     ax.set_title(f"$\Delta TOF$ vs $\Delta\phi$ ({rho_min} < Rconv < {rho_max} cm)", pad = 40)
-    ax.set_xlim(-0.5, 0.5)
+    ax.set_xlim(phi_low, phi_high)
     ax.set_ylim(-0.01, 0.2)
     ax.legend()
 
@@ -2078,7 +2085,7 @@ plt.close("all")
 
 # copy plots to EOS area
 outfolder = "0p1To10" if args.use_low_pt else "8To150"
-eosfolder = f"/eos/home-n/npalmeri/www/MTD/PhotonReco/GEN_level/{outfolder}"
+eosfolder = f"/eos/home-n/npalmeri/www/MTD/PhotonReco/GEN_level/{outfolder}/fabioFix"
 os.system(f"cp {local_folder}/*.png %s" % eosfolder)
 os.system(f"cp {local_folder}/*.pdf %s" % eosfolder)
 

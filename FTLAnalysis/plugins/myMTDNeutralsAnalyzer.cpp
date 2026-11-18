@@ -70,7 +70,7 @@
 #include "SimDataFormats/Associations/interface/MtdRecoClusterToSimLayerClusterAssociationMap.h"
 #include "SimDataFormats/Associations/interface/MtdSimLayerClusterToRecoClusterAssociationMap.h"
 
-#include "PrecisionTiming/FTLAnalysis/interface/MTDNeutralsTree_vectorized.h"
+#include "MTDPhotonConversion/FTLAnalysis/interface/MTDNeutralsTree_vectorized.h"
 
 using namespace edm;
 using namespace geant_units::operators;
@@ -392,7 +392,7 @@ void myMTDNeutralsAnalyzer::analyze(edm::Event const& iEvent, edm::EventSetup co
             std::sort(sortedRefs.begin(), sortedRefs.end(), [](const TrackingParticleRef& a, const TrackingParticleRef& b) { return a->pt() > b->pt(); });
             // TODO: fix reassignment.
             cp.genElectrons.clear();
-            for(auto& ref : sortedRefs)
+            for(auto& ref : sortedRefs) 
                 cp.genElectrons.push_back(ref);
             
             convertedPhotons.push_back(cp);

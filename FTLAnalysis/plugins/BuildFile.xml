@@ -36,7 +36,7 @@
 <use   name="RecoLocalFastTime/FTLRecProducers"/>
 <use   name="RecoLocalFastTime/FTLCommonAlgos"/>
 <use   name="ExternalTools/DynamicTTree"/>
-<use   name="PrecisionTiming/FTLAnalysis"/>
+<use   name="MTDPhotonConversion/FTLAnalysis"/>
 <flags EDM_PLUGIN="1"/>
 <export>
   <lib   name="1"></lib>
